@@ -49,6 +49,7 @@ binned <- windowCounts(bam.files, bin=TRUE, width=10000, param=param)
 #save(binned, file = paste0(DIR.OUT, "readCounts_windows_csaw_forNormalization.Rdata"))
 
 ## select the PRC-unrelated regions and select just baits regions for captured-seq data
+load(file = paste0(DIR.OUT, "readCounts_windows_csaw_forNormalization.Rdata"))
 design = as.data.frame(colData(binned))
 find.sampleID = function(x){
   #x = design$bam.files[1]
@@ -63,7 +64,6 @@ design$type[match(c(71079:71090), design$sampleID)] = "chipseq"
 
 
 Select.PRC.unrelated.Regions = TRUE
-Select.PRC.unrelated.Regions.inBaits.forCapturedData = TRUE
 
 if(Select.PRC.unrelated.Regions){
   sels = data.frame(regions.sel[, c(1:3)], stringsAsFactors = FALSE)
@@ -82,6 +82,14 @@ kk = which(design$type=="captured")
 binned.captured = binned[, kk]
 binned.chipseq = binned[, -kk]
 
+source("functions_analysis_captured.R")
+
+Calculate.Scaling.factors.for.Chipseq = TRUE
+if(Calculate.Scaling.factors.for.Chipseq){
+  
+  calcNormFactors.Caputred.using.csaw.edgeR(dd = binned.chipseq);
+  
+}
 
 if(Select.PRC.unrelated.Regions.inBaits.forCapturedData){
   baits = read.delim(file="../../Oliver/capture_seq/baits/baits_mm9G11D_withG11D.bed", sep = "\t", header = FALSE)
@@ -156,44 +164,8 @@ if(Filter.With.Baits)
   #summary(keep.simpl)
 }
 
-Filtering.binned = FALSE
-if(Filtering.binned)
-{
-  abundances <- aveLogCPM(asDGEList(binned), prior.count = 1)
-  summary(abundances)
-  
-  cutoff.average.counts = 5;
-  binned.keep <- abundances > aveLogCPM(cutoff.average.counts, lib.size=mean(binned$totals))
-  summary(binned.keep)
-  #keep.simple <- abundances > -1
-  binned.filtered <- binned[binned.keep,]
-  
-}
 
-lib.sizes.full = binned$totals;
-norms <- normOffsets(binned, type="scaling", lib.sizes=lib.sizes.full)
 
-filtered.data$norm.factors = norms
-
-par(mfrow=c(1, 1))
-plot(norms, filtered.data$totals/10^6, log='')
-abline(0, 1, lwd=2.0, col='red')
-
-# to visulize the normalization
-nb.for.test = 5
-par(mfrow=c(1, nb.for.test), mar=c(5, 4, 2, 1.5))
-adj.counts <- cpm(asDGEList(binned), log=TRUE)
-normfacs <- filtered.data$norm.factors
-
-for (i in 1:nb.for.test) {
-  cur.x <- adj.counts[,1]
-  cur.y <- adj.counts[,1+i]
-  smoothScatter(x=(cur.x+cur.y)/2+6*log2(10), y=cur.x-cur.y,
-                xlab="A", ylab="M", main=paste("1 vs", i+1))
-  all.dist <- diff(log2(normfacs[c(i+1, 1)]))
-  abline(h=all.dist, col="red")
-
-}
 
 ##################################################
 ## Section: start to use DESeq2 to test differential binding
