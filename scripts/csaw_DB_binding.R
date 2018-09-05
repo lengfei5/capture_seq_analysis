@@ -7,6 +7,8 @@
 ##################################################
 library(csaw)
 library(edgeR)
+library(GenomicRanges)
+library(rtracklayer)
 
 DIR.bams = "../../R6329_R6532_R6533_chipseq_captured/alignments/BAMs_All"
 DIR.OUT = '../results/normalization/'
@@ -30,19 +32,84 @@ colnames(design) <- c("intercept", "cell.type")
 #3 ) identify the median as scaling factors
 ########################################################
 ########################################################
+regions.sel = read.table(paste0(resDir, "Complement_mergedPRCsubunits_peaks_fromJorgeChipseq_mm9G11_dual.bed"),
+                         header = FALSE, sep = "\t")
 
+sizes = regions.sel[, 3] - regions.sel[,2]
+hist(log10(sizes))
 
-#library(csaw)
-frag.len <- 110
-win.width <- 120
-chr.selected = c(paste0("chr", c(1:18)))
+#frag.len <- 110
+#win.width <- 120
+chr.selected = c(paste0("chr", c(1:19)))
 param <- readParam(pe="none", dedup = TRUE, minq=30, restrict = chr.selected)
 
-data <- windowCounts(bam.files, ext=frag.len, width=win.width, param=param, bin = TRUE)
+binned <- windowCounts(bam.files, bin=TRUE, width=10000, param=param)
+
+## save the big file in case it is lost 
+#save(binned, file = paste0(DIR.OUT, "readCounts_windows_csaw_forNormalization.Rdata"))
+
+## select the PRC-unrelated regions and select just baits regions for captured-seq data
+design = as.data.frame(colData(binned))
+find.sampleID = function(x){
+  #x = design$bam.files[1]
+  x = unlist(strsplit(as.character(x), "_"))
+  #x = x[length(x)]
+  return(gsub(".bam", "", x[length(x)]))
+}
+
+design$sampleID = sapply(design$bam.files, find.sampleID)
+design$type = "captured"
+design$type[match(c(71079:71090), design$sampleID)] = "chipseq"
+
+
+Select.PRC.unrelated.Regions = TRUE
+Select.PRC.unrelated.Regions.inBaits.forCapturedData = TRUE
+
+if(Select.PRC.unrelated.Regions){
+  sels = data.frame(regions.sel[, c(1:3)], stringsAsFactors = FALSE)
+  colnames(sels) = c("chr", "start", "end")
+  sels$score=1;
+  df = makeGRangesFromDataFrame(sels)
+  
+  # filter windows out of baits
+  suppressMessages(keep <- overlapsAny(rowRanges(binned), df, type = "within"))
+  sum(keep)
+  
+  filtered.binned = binned[keep, ]
+}
+
+kk = which(design$type=="captured")
+binned.captured = binned[, kk]
+binned.chipseq = binned[, -kk]
+
+
+if(Select.PRC.unrelated.Regions.inBaits.forCapturedData){
+  baits = read.delim(file="../../Oliver/capture_seq/baits/baits_mm9G11D_withG11D.bed", sep = "\t", header = FALSE)
+  baits = data.frame(baits, stringsAsFactors = FALSE)
+  colnames(baits) = c("chr", "start", "end")
+  baits$score=1;
+  df = makeGRangesFromDataFrame(baits)
+  
+  # filter windows out of baits
+  suppressMessages(keep <- overlapsAny(rowRanges(data), df))
+  sum(keep)
+  
+  filtered.data = data[keep, ]
+}
+
+
+########################################################
+########################################################
+# Section: identify signals in the baits for capture-seq data
+########################################################
+########################################################
+
+data <- windowCounts(bam.files, ext=110, width=win.width, param=param, bin = TRUE)
 
 ## for normalization
-binned <- windowCounts(bam.files, bin=TRUE, width=100000, param=param)
 #binned <- windowCounts(bam.files, bin=TRUE, width=10000, param=param)
+
+
 
 save(data, binned, file = paste0(DIR.OUT, "readCounts_windows_csaw.Rdata"))
 
