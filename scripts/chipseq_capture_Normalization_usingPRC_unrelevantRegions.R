@@ -71,6 +71,11 @@ aa$V3[jj] = aa$V3[jj] + 9923
 mm9G11dual = paste0(resDir, "/Complement_mergedPRCsubunits_peaks_fromJorgeChipseq_mm9G11_dual.bed")
 write.table(aa, file=mm9G11dual, quote=FALSE, sep="\t", row.names=FALSE, col.names=FALSE)
 
+########################################################
+########################################################
+# Section: calculate scaling factors using PRC-unrelated regions for chip-seq and capture-seq data  
+########################################################
+########################################################
 
 
 
