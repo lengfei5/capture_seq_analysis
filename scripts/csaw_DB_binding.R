@@ -1,5 +1,5 @@
 ##################################################
-## Project: capture-seq analysis
+## Project: Capture-seq analysis
 ## Script purpose: use csaw to do differential binding analysis for capture-seq 
 ## Usage example: 
 ## Author: Jingkui Wang (jingkui.wang@imp.ac.at)
@@ -8,9 +8,10 @@
 library(csaw)
 library(edgeR)
 
-DIR.bams = "../R5880_R5455_merged/alignments/BAMs_All"
-DIR.OUT = 'results/csaw/'
+DIR.bams = "../../R6329_R6532_R6533_chipseq_captured/alignments/BAMs_All"
+DIR.OUT = '../results/normalization/'
 resDir = DIR.OUT;
+
 if(!dir.exists(DIR.OUT)) system(paste0('mkdir -p ', DIR.OUT))
 
 bam.files = list.files(path = DIR.bams, pattern = "*.bam$", full.names = TRUE)
@@ -19,6 +20,17 @@ bam.files = list.files(path = DIR.bams, pattern = "*.bam$", full.names = TRUE)
 ## design matrxi (to define later)
 design <- model.matrix(~factor(c('es', 'es', 'tn', 'tn')))
 colnames(design) <- c("intercept", "cell.type")
+
+########################################################
+########################################################
+# Section: Normalization
+# calculate the scaling factors for normalization
+# 1) we quantify read counts within windows using csaw 
+# 2) select windows not releveant to PRC binding (and within the baits for capture-seq data)
+#3 ) identify the median as scaling factors
+########################################################
+########################################################
+
 
 #library(csaw)
 frag.len <- 110

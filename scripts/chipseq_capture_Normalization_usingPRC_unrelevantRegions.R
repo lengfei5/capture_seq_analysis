@@ -1,7 +1,9 @@
 ##########################################################################
 ##########################################################################
 # Project: Daniel's captured-seq data
-# Script purpose: to identify PRC-unrelated geneomic regions based on which the normalization will be done 
+# Script purpose: 
+# 1) to identify PRC-unrelated geneomic regions based on which the normalization will be done 
+# 2) The output is a bed file with coordinates of geneomic regions which are not bound by PRC subunits in ChIP-seq data
 # Usage example: 
 # Author: Jingkui Wang (jingkui.wang@imp.ac.at)
 # Date of creation: Mon Sep  3 14:24:13 2018
@@ -71,11 +73,7 @@ aa$V3[jj] = aa$V3[jj] + 9923
 mm9G11dual = paste0(resDir, "/Complement_mergedPRCsubunits_peaks_fromJorgeChipseq_mm9G11_dual.bed")
 write.table(aa, file=mm9G11dual, quote=FALSE, sep="\t", row.names=FALSE, col.names=FALSE)
 
-########################################################
-########################################################
-# Section: calculate scaling factors using PRC-unrelated regions for chip-seq and capture-seq data  
-########################################################
-########################################################
+
 
 
 
