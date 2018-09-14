@@ -349,6 +349,20 @@ find.samples.conditions = function(x, ID='samples')
 
 merge.peaks.macs2 = function(peak.list){
   
+  # peak.list = peaks
+  for(n in 1:length(peak.list)){
+    cat(peak.list[n], "\n")
+    if(n == 1){
+      peaks.merged <- readPeakFile(peak.list[n] , as = "GRanges")  
+    }else{
+      px = readPeakFile(peak.list[n] , as = "GRanges")  
+      peaks.merged = union(peaks.merged, px, ignore.strand=TRUE)
+    }
+  }
+  
+  peaks.merged = as.data.frame(peaks.merged)
+  return(peaks.merged)
+  
 }
 
 Assess.ChIPseq.Quality.4DB = function(dds, batch = FALSE) ### Input is DEseq2 object from read counts within peak union across condition
