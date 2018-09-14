@@ -54,8 +54,10 @@ calcNormFactors.for.caputred.using.csaw = function(dd, cutoff.average.counts = 2
     countData = assay(dd);
     condition <- factor(rep("A", ncol(countData)))
     
+    
     dds <- DESeqDataSetFromMatrix(assay(dd), data.frame(condition),  design = ~ 1 )
     dds <- dds[ rowSums(counts(dds)) > cutoff.average.counts, ]
+    #fpm = fpm(dds, robust = TRUE)
     
     cat("after filtering--", nrow(dds), "\n")
     
@@ -70,10 +72,9 @@ calcNormFactors.for.caputred.using.csaw = function(dd, cutoff.average.counts = 2
     plot(xx, yy, log = 'xy', xlab='library size', ylab="size.factors")
     abline(0, 1, col='red', lwd=2.0)
     text(xx, yy, basename(norms$bam.files), cex=0.6, pos = 1, offset = 0.5)
-    #fpm = fpm(dds, robust = TRUE)
+    
     #vsd <- varianceStabilizingTransformation(dds, blind = FALSE)
   }
   
   return(norms)
-  
 }

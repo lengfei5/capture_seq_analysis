@@ -10,7 +10,7 @@ library(edgeR)
 library(GenomicRanges)
 library(rtracklayer)
 
-DIR.bams = "../../R6329_R6532_R6533_chipseq_captured/alignments/BAMs_All"
+DIR.bams = "../../R6329_R6532_R6533_chipseq_captured/alignments/BAMs_unique_rmdup"
 DIR.OUT = '../results/normalization/'
 resDir = DIR.OUT;
 
@@ -53,7 +53,7 @@ param <- readParam(pe="none", dedup = TRUE, minq=30, restrict = chr.selected)
 binned <- windowCounts(bam.files, bin=TRUE, width=win.width, param=param)
 
 ## save the big file in case it is lost 
-save(binned, file = paste0(DIR.OUT, "readCounts_windows_csaw_forNormalization.Rdata"))
+save(binned, file = paste0(DIR.OUT, "bam_unique_rmdup_readCounts_windows_csaw_forNormalization.Rdata"))
 
 ###############################
 # select the PRC-unrelated regions and select just baits regions for captured-seq data 
@@ -61,18 +61,22 @@ save(binned, file = paste0(DIR.OUT, "readCounts_windows_csaw_forNormalization.Rd
 Select.PRC.unrelated.Regions = TRUE
 Select.PRC.unrelated.Regions.inBaits.forCapturedData = TRUE
 
-load(file = paste0(DIR.OUT, "readCounts_windows_csaw_forNormalization.Rdata"))
+load(file = paste0(DIR.OUT, "bam_unique_rmdup_readCounts_windows_csaw_forNormalization.Rdata"))
+
 design = as.data.frame(colData(binned))
 find.sampleID = function(x){
   #x = design$bam.files[1]
-  x = unlist(strsplit(as.character(x), "_"))
-  #x = x[length(x)]
-  return(gsub(".bam", "", x[length(x)]))
+  x = unlist(strsplit(as.character(basename(x)), "_"))
+  x = x[-c(length(x), (length(x)-1))]
+  return(x[length(x)])
 }
 
 design$sampleID = sapply(design$bam.files, find.sampleID)
 design$type = "captured"
 design$type[match(c(71079:71090), design$sampleID)] = "chipseq"
+design$IP = sapply(design$bam.files, function(x) unlist(strsplit(as.character(basename(x)), "_"))[1]) 
+design$condition = sapply(design$bam.files, function(x) unlist(strsplit(as.character(basename(x)), "_"))[2]) 
+design = data.frame(design, stringsAsFactors = FALSE)
 
 if(Select.PRC.unrelated.Regions){
   sels = data.frame(regions.sel[, c(1:3)], stringsAsFactors = FALSE)
@@ -93,10 +97,7 @@ if(Calculate.Scaling.factors.for.Chipseq){
   binned.chipseq = filtered.binned[, which(design$type=="chipseq")]
   source("functions_analysis_captured.R")
   
-  norms.chipseq = calcNormFactors.for.caputred.using.csaw(dd = binned.chipseq, method = "DESeq2", cutoff.average.counts = 400);
-  
-  #xx = norms.chipseq$total.filtered/norms$totals
-  #xx = xx/mean(xx)
+  norms.chipseq = calcNormFactors.for.caputred.using.csaw(dd = binned.chipseq, method = "DESeq2", cutoff.average.counts = 300);
   
 }
 
@@ -120,11 +121,32 @@ if(Select.PRC.unrelated.Regions.inBaits.forCapturedData){
   
 }
 
-save(norms.captured, norms.chipseq, file = paste0(DIR.OUT, "normalization_factors_for_chipseq_captured_seq.Rdata"))
 
-###############################
-# make bigwig file to check if normalization works or not 
-###############################
+save(norms.captured, norms.chipseq, design, file = paste0(DIR.OUT, "normalization_factors_for_chipseq_captured_seq.Rdata"))
+
+########################################################
+########################################################
+# Section: Differential Binding analysis and test the size facotrs of normalization  
+########################################################
+########################################################
+load(file = paste0(DIR.OUT, "normalization_factors_for_chipseq_captured_seq.Rdata"))
+DIR.peaks = "../../R6329_R6532_R6533_chipseq_captured/Peaks/macs2_broad"
+peak.list = list.files(path = DIR.peaks, pattern = "*.xls", full.names = TRUE)
+peak.list = peak.list[grep("710", peak.list)]
+
+for(prot in c("Cbx7", "Ring1B")){
+  
+  # prot = "Cbx7"
+  peaks = peak.list[grep(prot, peak.list)];
+  
+  
+}
+
+########################################################
+########################################################
+# Section: make bigwig file with the size factors identified by previous step
+########################################################
+########################################################
 load(file = paste0(DIR.OUT, "normalization_factors_for_chipseq_captured_seq.Rdata"))
 library(GenomicAlignments)
 library(rtracklayer)
@@ -132,26 +154,32 @@ library(rtracklayer)
 bw.Dir = paste0(resDir, "normalizedBigWigs/")
 if(!dir.exists(bw.Dir)) system(paste0('mkdir -p ', bw.Dir))
 
-norms = rbind(norms.chipseq, norms.captured)
-norms = data.frame(norms)
+#norms = rbind(norms.chipseq, norms.captured)
 
-param <- ScanBamParam(flag=scanBamFlag(isDuplicate=FALSE, isSecondaryAlignment=FALSE),
-                      mapqFilter = 30)
-
-for(n in 1:nrow(norms)){
-  # n = 1
-  ga = readGAlignments(norms$bam.files[n], param=param)
-  xx = coverage(ga)
-  #xx = xx/norms$totals[n]
-  xx = 
-  bwname = basename(norms$bam.files[1])
-  bwname = gsub(".bam", ".bw",bwname)
-  export.bw(xx, con = paste0(bw.Dir, bwname))
+Normalize.chipseq.make.BigWig = FALSE
+if(Normalize.chipseq.data){
+  norms = norms.chipseq
+  norms = data.frame(norms)
+  
+  plot(norms$totals, norms$size.factors, log = 'xy')
+  
+  param <- ScanBamParam(flag=scanBamFlag(isDuplicate=FALSE, isSecondaryAlignment=FALSE),
+                        mapqFilter = 30)
+  
+  for(n in 1:nrow(norms)){
+    # n = 2
+    cat(norms$bam.files[n], "---")
+    ga = readGAlignments(norms$bam.files[n], param=param)
+    xx = coverage(ga)
+    xx = xx*norms$totals[n]/mean(norms$totals)/norms$size.factors[n]
+    #xx = 
+    bwname = basename(norms$bam.files[n])
+    bwname = gsub(".bam", "_normalized.bw",bwname)
+    cat(bwname, "\n")
+    export.bw(xx, con = paste0(bw.Dir, bwname))
+  }
   
 }
-
-
-
 
 
 ########################################################
