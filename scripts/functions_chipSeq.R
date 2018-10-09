@@ -401,67 +401,53 @@ merge.peaks.macs2 = function(peak.list){
   
   peaks.merged = as.data.frame(peaks.merged)
   return(peaks.merged)
+  
 }
 
-quantify.signals.within.peaks = function()
+quantify.signals.within.peaks = function(peaks, bam.list, normalization = FALSE)
 {
   ## peak regions (configure your peak regions into a data.frame)
+  peaks = data.frame(peaks)
+  colnames(peaks)[c(1:3)] = c("chr", "start", "end")
+  peaks$peak.name = paste0(peaks$chr, "_", peaks$start, "_", peaks$end)
   jj = match(unique(peaks$peak.name), peaks$peak.name)
   df = peaks[jj, ];
-  SAF = data.frame(GeneID=df$peak.name, Chr=df$chr.peak, Start=df$start.peak, End=df$end.peak, Strand="+", stringsAsFactors = FALSE)
+  
+  SAF = data.frame(GeneID=df$peak.name, Chr=df$chr, Start=df$start, End=df$end, Strand="+", stringsAsFactors = FALSE)
   
   ## count reads for those peak regions using 
   fc <- featureCounts(files=bam.list, annot.ext = SAF, countMultiMappingReads = FALSE, minMQS = 10, 
-                      ignoreDup = TRUE, strandSpecific = 0, juncCounts = FALSE, nthreads = 20)
+                      ignoreDup = TRUE, strandSpecific = 0, juncCounts = FALSE, nthreads = 6)
   stat = fc$stat;
   counts = fc$counts;
   counts.annot = fc$annotation
   
-  rpkm = matrix(NA, ncol = ncol(counts), nrow = nrow(counts))
-  colnames(rpkm) = colnames(counts)
-  row.names(rpkm) = rownames(counts)
-  kk = which(stat$Status=="Assigned" | stat$Status== "Unassigned_NoFeatures")
-  
-  for(n in 1:ncol(counts))
-  {
-    #n = 1 
-    jj = which(colnames(stat) == colnames(counts)[n])
-    rpkm[, n] = (counts[, n])/counts.annot$Length/sum(stat[kk, jj])*10^9
-  }
-  
-  #rpkm = log2(rpkm)
-  res = data.frame(SAF, Length=counts.annot$Length[match(SAF$GeneID, counts.annot$GeneID)], 
-                   rpkm[match(SAF$GeneID, rownames(rpkm)), ], stringsAsFactors = FALSE)
-  
-  ## change colnames
-  if(Change.Sample.Names)
-  {
-    names = colnames(res)[-c(1:7)]
-    for(n in 1:length(names))
-    {
-      #n = 1
-      test = unlist(strsplit(as.character(names[n]), "[.]"))
-      test = test[3]
-      if(length(grep("Input", test))>0){
-        ttest = unlist(strsplit(as.character(test), "_"))
-        names[n] = paste0(ttest[c(1,3, 2)], collapse = "_")
-      }
-      if(length(grep("_H3K", test))>0){
-        ttest = unlist(strsplit(as.character(test), "_"))
-        names[n] = paste0(ttest[c(1, 4, 2)], collapse = "_")
-      }
-      if(length(grep("tbx3", test))>0) names[n] = test
-    }
-    colnames(res)[-c(1:7)] = names
+  if(normalization){
+    rpkm = matrix(NA, ncol = ncol(counts), nrow = nrow(counts))
+    colnames(rpkm) = colnames(counts)
+    row.names(rpkm) = rownames(counts)
+    kk = which(stat$Status=="Assigned" | stat$Status== "Unassigned_NoFeatures")
     
-    kk = grep("6291|6344|Input", colnames(res)) ## all inputs for histone modifications are the same one.
-    if(length(kk)>0) res = res[, -kk]
+    for(n in 1:ncol(counts))
+    {
+      #n = 1 
+      jj = which(colnames(stat) == colnames(counts)[n])
+      rpkm[, n] = (counts[, n])/counts.annot$Length/sum(stat[kk, jj])*10^9
+    }
+    
+    #rpkm = log2(rpkm)
+    res = data.frame(SAF, Length=counts.annot$Length[match(SAF$GeneID, counts.annot$GeneID)], 
+                     rpkm[match(SAF$GeneID, rownames(rpkm)), ], stringsAsFactors = FALSE)
+    
+  }else{
+    res = counts;
   }
-  
   
   ## save the peak information and quantified different rpkm signals within peaks
-  write.table(res, file=paste0(DIR.res, "/rpkm_within_chipeakk.txt"), sep = "\t", quote = FALSE, row.names = FALSE, col.names = TRUE)
+  #write.table(res, file=paste0(DIR.res, "/rpkm_within_chipeakk.txt"), sep = "\t", quote = FALSE, row.names = FALSE, col.names = TRUE)
   #save(peaks, res, file='Rdata/Peaks_merged_macs2_p_5_filtered_N2_gene_assignment_TSS_WBcel235_analysis_hisModif_tbx_signals_v1.Rdata')
+  
+  return(res)
   
 }
 

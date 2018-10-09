@@ -141,6 +141,8 @@ for(prot in c("Cbx7", "Ring1B")){
   peaks = merge.peaks.macs2(peak.list[grep(prot, peak.list)]);
   bams = design$bam.files[which(design$type=="chipseq" & design$IP=="Cbx7")]
   
+  counts = quantify.signals.within.peaks(peaks, )
+  
   
 }
 
