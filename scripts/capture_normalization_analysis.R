@@ -74,8 +74,8 @@ find.sampleID = function(x){
 design$sampleID = sapply(design$bam.files, find.sampleID)
 design$type = "captured"
 design$type[match(c(71079:71090), design$sampleID)] = "chipseq"
-design$IP = sapply(design$bam.files, function(x) unlist(strsplit(as.character(basename(x)), "_"))[1]) 
-design$condition = sapply(design$bam.files, function(x) unlist(strsplit(as.character(basename(x)), "_"))[2]) 
+design$condition = sapply(design$bam.files, function(x) unlist(strsplit(as.character(basename(x)), "_"))[1]) 
+design$IP = sapply(design$bam.files, function(x) unlist(strsplit(as.character(basename(x)), "_"))[2]) 
 design = data.frame(design, stringsAsFactors = FALSE)
 
 if(Select.PRC.unrelated.Regions){
@@ -121,7 +121,6 @@ if(Select.PRC.unrelated.Regions.inBaits.forCapturedData){
   
 }
 
-
 save(norms.captured, norms.chipseq, design, file = paste0(DIR.OUT, "normalization_factors_for_chipseq_captured_seq.Rdata"))
 
 ########################################################
@@ -134,10 +133,13 @@ DIR.peaks = "../../R6329_R6532_R6533_chipseq_captured/Peaks/macs2_broad"
 peak.list = list.files(path = DIR.peaks, pattern = "*.xls", full.names = TRUE)
 peak.list = peak.list[grep("710", peak.list)]
 
+source("functions_chipseq.R")
+
 for(prot in c("Cbx7", "Ring1B")){
   
   # prot = "Cbx7"
-  peaks = peak.list[grep(prot, peak.list)];
+  peaks = merge.peaks.macs2(peak.list[grep(prot, peak.list)]);
+  bams = design$bam.files[which(design$type=="chipseq" & design$IP=="Cbx7")]
   
   
 }
