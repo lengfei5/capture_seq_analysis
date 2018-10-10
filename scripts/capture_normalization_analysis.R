@@ -121,7 +121,8 @@ if(Select.PRC.unrelated.Regions.inBaits.forCapturedData){
   
 }
 
-save(norms.captured, norms.chipseq, design, file = paste0(DIR.OUT, "normalization_factors_for_chipseq_captured_seq.Rdata"))
+save(binned.chipseq, binned.captured, 
+     norms.captured, norms.chipseq, design, file = paste0(DIR.OUT, "normalization_factors_for_chipseq_captured_seq.Rdata"))
 
 ########################################################
 ########################################################
@@ -133,16 +134,31 @@ DIR.peaks = "../../R6329_R6532_R6533_chipseq_captured/Peaks/macs2_broad"
 peak.list = list.files(path = DIR.peaks, pattern = "*.xls", full.names = TRUE)
 peak.list = peak.list[grep("710", peak.list)]
 
-source("functions_chipseq.R")
-
 for(prot in c("Cbx7", "Ring1B")){
   
-  # prot = "Cbx7"
+  # prot = "Ring1B"
   peaks = merge.peaks.macs2(peak.list[grep(prot, peak.list)]);
   bams = design$bam.files[which(design$type=="chipseq" & design$IP=="Cbx7")]
+  design.matrix = design[which(design$type=="chipseq" & design$IP=="Cbx7"), ]
+  source("functions_chipSeq.R")
+  counts = quantify.signals.within.peaks(peaks, bam.list = bams)
+  #colnames(counts) = basename(bams)
   
-  counts = quantify.signals.within.peaks(peaks, )
+  source("functions_analysis_captured.R")
+  norms.chipseq = calcNormFactors.for.caputred.using.csaw(dd = binned.chipseq, method = "DESeq2", cutoff.average.counts = 300);
   
+  norms = norms.chipseq$size.factors[match(design.matrix$bam.files, norms.chipseq$bam.files)] 
+  #design.matrix = data.frame(design.matrix)
+  
+  kk = which(colnames(design.matrix) == "condition")
+  
+  pdfname = paste0(resDir, "Data_Qulity_Assessment_DB_analysis_ChIPseq_", prot, ".pdf")
+  pdf(pdfname, width = 12, height = 10)
+  
+  source("functions_chipSeq.R")
+  res = DB.analysis(counts, design.matrix[, kk], size.factors = NULL, Threshold.read.counts = 50)
+  
+  dev.off()
   
 }
 
@@ -184,7 +200,6 @@ if(Normalize.chipseq.data){
   }
   
 }
-
 
 ########################################################
 ########################################################
@@ -239,8 +254,6 @@ if(Filter.With.Baits)
   filtered.data <- data[keep,]
   #summary(keep.simpl)
 }
-
-
 
 
 ##################################################
