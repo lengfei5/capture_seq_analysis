@@ -11,10 +11,12 @@ library(GenomicRanges)
 library(rtracklayer)
 
 DIR.bams = "../../R6329_R6532_R6533_chipseq_captured/alignments/BAMs_unique_rmdup"
-DIR.OUT = '../results/normalization/'
-resDir = DIR.OUT;
+resDir = '../results/DB_capture/'
+NormDir = "../results/normalization/";
 
-if(!dir.exists(DIR.OUT)) system(paste0('mkdir -p ', DIR.OUT))
+#resDir = NormDir;
+
+if(!dir.exists(resDir)) system(paste0('mkdir -p ', resDir))
 
 bam.files = list.files(path = DIR.bams, pattern = "*.bam$", full.names = TRUE)
 #bam.files <- c("es_1.bam", "es_2.bam", "tn_1.bam", "tn_2.bam")
@@ -25,14 +27,14 @@ bam.files = list.files(path = DIR.bams, pattern = "*.bam$", full.names = TRUE)
 
 ########################################################
 ########################################################
-# Section: Normalization
+# Section I : Normalization
 # calculate the scaling factors for normalization
 # 1) we quantify read counts within windows using csaw 
 # 2) select windows not releveant to PRC binding (and within the baits for capture-seq data)
 #3 ) identify the median as scaling factors
 ########################################################
 ########################################################
-regions.sel = read.table(paste0(resDir, "Complement_mergedPRCsubunits_peaks_fromJorgeChipseq_mm9G11_dual.bed"),
+regions.sel = read.table(paste0(normDir, "Complement_mergedPRCsubunits_peaks_fromJorgeChipseq_mm9G11_dual.bed"),
                          header = FALSE, sep = "\t")
 
 sizes = regions.sel[, 3] - regions.sel[,2]
@@ -53,7 +55,7 @@ param <- readParam(pe="none", dedup = TRUE, minq=30, restrict = chr.selected)
 binned <- windowCounts(bam.files, bin=TRUE, width=win.width, param=param)
 
 ## save the big file in case it is lost 
-save(binned, file = paste0(DIR.OUT, "bam_unique_rmdup_readCounts_windows_csaw_forNormalization.Rdata"))
+save(binned, file = paste0(NormDir, "bam_unique_rmdup_readCounts_windows_csaw_forNormalization.Rdata"))
 
 ###############################
 # select the PRC-unrelated regions and select just baits regions for captured-seq data 
@@ -61,7 +63,7 @@ save(binned, file = paste0(DIR.OUT, "bam_unique_rmdup_readCounts_windows_csaw_fo
 Select.PRC.unrelated.Regions = TRUE
 Select.PRC.unrelated.Regions.inBaits.forCapturedData = TRUE
 
-load(file = paste0(DIR.OUT, "bam_unique_rmdup_readCounts_windows_csaw_forNormalization.Rdata"))
+load(file = paste0(NormDir, "bam_unique_rmdup_readCounts_windows_csaw_forNormalization.Rdata"))
 
 design = as.data.frame(colData(binned))
 find.sampleID = function(x){
@@ -90,46 +92,29 @@ if(Select.PRC.unrelated.Regions){
   
   filtered.binned = binned[keep, ]
 }
+#binned.chipseq = filtered.binned[, which(design$type=="chipseq")]
 
-Calculate.Scaling.factors.for.Chipseq = TRUE
+save(binned.chipseq, binned.captured, 
+     norms.captured, norms.chipseq, design, file = paste0(NormDir, "normalization_factors_for_chipseq_captured_seq.Rdata"))
+
+
+Calculate.Scaling.factors.for.Chipseq = FALSE
 if(Calculate.Scaling.factors.for.Chipseq){
   
-  binned.chipseq = filtered.binned[, which(design$type=="chipseq")]
+ 
   source("functions_analysis_captured.R")
   
   norms.chipseq = calcNormFactors.for.caputred.using.csaw(dd = binned.chipseq, method = "DESeq2", cutoff.average.counts = 300);
   
 }
 
-if(Select.PRC.unrelated.Regions.inBaits.forCapturedData){
-  
-  binned.captured = filtered.binned[, which(design$type=="captured")]
-
-  df = makeGRangesFromDataFrame(baits)
-  
-  # filter windows out for captured-seq data
-  suppressMessages(keep <- overlapsAny(rowRanges(binned.captured), df))
-  sum(keep)
-  
-  binned.captured = binned.captured[keep, ]
-  
-  kk = which(binned.captured$totals>100000)
-  binned.captured = binned.captured[, kk]
-  
-  source("functions_analysis_captured.R")
-  norms.captured = calcNormFactors.for.caputred.using.csaw(dd = binned.captured, method = "DESeq2", cutoff.average.counts = 1000);
-  
-}
-
-save(binned.chipseq, binned.captured, 
-     norms.captured, norms.chipseq, design, file = paste0(DIR.OUT, "normalization_factors_for_chipseq_captured_seq.Rdata"))
-
 ########################################################
 ########################################################
-# Section: Differential Binding analysis and test the size facotrs of normalization for ChIP-seq data 
+# Section: II 
+# Differential Binding analysis and test the size facotrs of normalization for ChIP-seq data 
 ########################################################
 ########################################################
-load(file = paste0(DIR.OUT, "normalization_factors_for_chipseq_captured_seq.Rdata"))
+load(file = paste0(NormDir, "normalization_factors_for_chipseq_captured_seq.Rdata"))
 DIR.peaks = "../../R6329_R6532_R6533_chipseq_captured/Peaks/macs2_broad"
 peak.list = list.files(path = DIR.peaks, pattern = "*.xls", full.names = TRUE)
 peak.list = peak.list[grep("710", peak.list)]
@@ -147,6 +132,7 @@ for(prot in c("Cbx7", "Ring1B")){
   counts = quantify.signals.within.peaks(peaks, bam.list = bams)
   #colnames(counts) = basename(bams)
   
+  binned.chipseq = filtered.binned[, which(design$type=="chipseq")]
   source("functions_analysis_captured.R")
   norms.chipseq = calcNormFactors.for.caputred.using.csaw(dd = binned.chipseq, method = "DESeq2", cutoff.average.counts = 300);
   
@@ -168,7 +154,7 @@ for(prot in c("Cbx7", "Ring1B")){
 ###############################
 #  make bigwig file with the size factors identified by previous step for ChIP-seq data
 ###############################
-load(file = paste0(DIR.OUT, "normalization_factors_for_chipseq_captured_seq.Rdata"))
+load(file = paste0(NormDir, "normalization_factors_for_chipseq_captured_seq.Rdata"))
 library(GenomicAlignments)
 library(rtracklayer)
 
@@ -203,9 +189,15 @@ if(Normalize.chipseq.data){
 
 ########################################################
 ########################################################
-# Section: identify signals in the baits for capture-seq data
+# Section III: 
+# identify signals in the baits for capture-seq data
 ########################################################
 ########################################################
+#frag.len <- 110
+win.width <- 2000
+chr.selected = c(paste0("chr", c(1:19)))
+param <- readParam(pe="none", dedup = TRUE, minq=30, restrict = chr.selected)
+
 data <- windowCounts(bam.files, ext=110, width=win.width, param=param, bin = TRUE)
 
 ## for normalization
@@ -254,6 +246,27 @@ if(Filter.With.Baits)
   filtered.data <- data[keep,]
   #summary(keep.simpl)
 }
+
+if(Select.PRC.unrelated.Regions.inBaits.forCapturedData){
+  
+  binned.captured = filtered.binned[, which(design$type=="captured")]
+  
+  df = makeGRangesFromDataFrame(baits)
+  
+  # filter windows out for captured-seq data
+  suppressMessages(keep <- overlapsAny(rowRanges(binned.captured), df))
+  sum(keep)
+  
+  binned.captured = binned.captured[keep, ]
+  
+  kk = which(binned.captured$totals>100000)
+  binned.captured = binned.captured[, kk]
+  
+  source("functions_analysis_captured.R")
+  norms.captured = calcNormFactors.for.caputred.using.csaw(dd = binned.captured, method = "DESeq2", cutoff.average.counts = 1000);
+  
+}
+
 
 
 ##################################################
@@ -361,35 +374,3 @@ for(sel.bait in all.baits)
   }
   dev.off()
 }
-
-#design <- model.matrix(~genotype+IP)
-#rownames(design) <- colnames(y)
-#design
-#y = asDGEList(filtered.data)
-
-#y = estimateDisp(y, design)
-#summary(y$trended.dispersion)
-
-#fit <- glmQLFit(y, design, robust=TRUE)
-#summary(fit$var.post)
-#par(mfrow=c(1,2))
-#o <- order(y$AveLogCPM)
-#plot(y$AveLogCPM[o], sqrt(y$trended.dispersion[o]), type="l", lwd=2,
-#     ylim=c(0, 1), xlab=expression("Ave."~Log[2]~"CPM"),
-#     ylab=("Biological coefficient of variation"))
-#plotQLDisp(fit)
-
-## extrac the pairwise comparisons using contrast in edgeR
-#results <- glmQLFTest(fit, contrast=c(0, 1))
-#head(results$table)
-#rowData(filtered.data) <- cbind(rowData(filtered.data), results$table)
-# par(mfrow=c(2,2), mar=c(5,4,2,2))
-# adj.counts <- cpm(y, log=TRUE)
-# for (top in c(1000)) {
-#   out <- plotMDS(adj.counts, main=top, col=c("blue", "blue", "red", "red"),
-#                  labels=basename(filtered.data$bam.files), top=top)
-# }
-
-
-
-
