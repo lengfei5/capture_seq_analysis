@@ -395,7 +395,7 @@ merge.peaks.macs2 = function(peak.list){
       peaks.merged <- readPeakFile(peak.list[n] , as = "GRanges")  
     }else{
       px = readPeakFile(peak.list[n] , as = "GRanges")  
-      peaks.merged = union(peaks.merged, px, ignore.strand=TRUE)
+      peaks.merged = GenomicRanges::union(peaks.merged, px, ignore.strand=TRUE)
     }
   }
   
@@ -570,7 +570,7 @@ DB.analysis= function(counts, design.matrix, size.factors = NULL, batch = FALSE,
   yy = log2(yy)
   
   pairs(yy, lower.panel=NULL, upper.panel=panel.fitting)
-  pairs(assay(vsd), lower.panel = NULL, upper.panel = panel.fitting)
+  #pairs(assay(vsd), lower.panel = NULL, upper.panel = panel.fitting)
   
   #cc.partA = c("AN312", "515D10", "515D10H3")
   #cc.partB = c("AN312", "515D10", "D10A8", "D10D8")

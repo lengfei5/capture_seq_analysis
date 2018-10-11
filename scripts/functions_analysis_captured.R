@@ -54,8 +54,8 @@ calcNormFactors.for.caputred.using.csaw = function(dd, cutoff.average.counts = 2
     countData = assay(dd);
     condition <- factor(rep("A", ncol(countData)))
     
-    
     dds <- DESeqDataSetFromMatrix(assay(dd), data.frame(condition),  design = ~ 1 )
+    #yy0 = rowSums(counts(dds)); cutoff.average.counts = quantile(yy0, 0.8) 
     dds <- dds[ rowSums(counts(dds)) > cutoff.average.counts, ]
     #fpm = fpm(dds, robust = TRUE)
     

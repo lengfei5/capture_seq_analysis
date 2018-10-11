@@ -126,7 +126,7 @@ save(binned.chipseq, binned.captured,
 
 ########################################################
 ########################################################
-# Section: Differential Binding analysis and test the size facotrs of normalization  
+# Section: Differential Binding analysis and test the size facotrs of normalization for ChIP-seq data 
 ########################################################
 ########################################################
 load(file = paste0(DIR.OUT, "normalization_factors_for_chipseq_captured_seq.Rdata"))
@@ -136,10 +136,13 @@ peak.list = peak.list[grep("710", peak.list)]
 
 for(prot in c("Cbx7", "Ring1B")){
   
-  # prot = "Ring1B"
+  # prot = "Cbx7"
+  source("functions_chipSeq.R")
+  
   peaks = merge.peaks.macs2(peak.list[grep(prot, peak.list)]);
-  bams = design$bam.files[which(design$type=="chipseq" & design$IP=="Cbx7")]
-  design.matrix = design[which(design$type=="chipseq" & design$IP=="Cbx7"), ]
+  bams = design$bam.files[which(design$type=="chipseq" & design$IP==prot)]
+  design.matrix = design[which(design$type=="chipseq" & design$IP==prot), ]
+  
   source("functions_chipSeq.R")
   counts = quantify.signals.within.peaks(peaks, bam.list = bams)
   #colnames(counts) = basename(bams)
@@ -162,11 +165,9 @@ for(prot in c("Cbx7", "Ring1B")){
   
 }
 
-########################################################
-########################################################
-# Section: make bigwig file with the size factors identified by previous step
-########################################################
-########################################################
+###############################
+#  make bigwig file with the size factors identified by previous step for ChIP-seq data
+###############################
 load(file = paste0(DIR.OUT, "normalization_factors_for_chipseq_captured_seq.Rdata"))
 library(GenomicAlignments)
 library(rtracklayer)
@@ -175,7 +176,6 @@ bw.Dir = paste0(resDir, "normalizedBigWigs/")
 if(!dir.exists(bw.Dir)) system(paste0('mkdir -p ', bw.Dir))
 
 #norms = rbind(norms.chipseq, norms.captured)
-
 Normalize.chipseq.make.BigWig = FALSE
 if(Normalize.chipseq.data){
   norms = norms.chipseq
