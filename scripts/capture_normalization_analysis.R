@@ -13,6 +13,7 @@ library(rtracklayer)
 DIR.bams = "../../R6329_R6532_R6533_chipseq_captured/alignments/BAMs_unique_rmdup"
 resDir = '../results/DB_capture/'
 NormDir = "../results/normalization/";
+version.analysis = "_20181017"
 
 #resDir = NormDir;
 
@@ -34,7 +35,7 @@ bam.files = list.files(path = DIR.bams, pattern = "*.bam$", full.names = TRUE)
 #3 ) identify the median as scaling factors
 ########################################################
 ########################################################
-regions.sel = read.table(paste0(normDir, "Complement_mergedPRCsubunits_peaks_fromJorgeChipseq_mm9G11_dual.bed"),
+regions.sel = read.table(paste0(NormDir, "Complement_mergedPRCsubunits_peaks_fromJorgeChipseq_mm9G11_dual.bed"),
                          header = FALSE, sep = "\t")
 
 sizes = regions.sel[, 3] - regions.sel[,2]
@@ -55,15 +56,15 @@ param <- readParam(pe="none", dedup = TRUE, minq=30, restrict = chr.selected)
 binned <- windowCounts(bam.files, bin=TRUE, width=win.width, param=param)
 
 ## save the big file in case it is lost 
-save(binned, file = paste0(NormDir, "bam_unique_rmdup_readCounts_windows_csaw_forNormalization.Rdata"))
+save(binned, baits, file = paste0(NormDir, "bam_unique_rmdup_readCounts_windows_csaw_forNormalization.Rdata"))
 
 ###############################
 # select the PRC-unrelated regions and select just baits regions for captured-seq data 
 ###############################
-Select.PRC.unrelated.Regions = TRUE
-Select.PRC.unrelated.Regions.inBaits.forCapturedData = TRUE
-
 load(file = paste0(NormDir, "bam_unique_rmdup_readCounts_windows_csaw_forNormalization.Rdata"))
+
+Select.PRC.unrelated.Regions = TRUE
+#Select.PRC.unrelated.Regions.inBaits.forCapturedData = TRUE
 
 design = as.data.frame(colData(binned))
 find.sampleID = function(x){
@@ -94,19 +95,8 @@ if(Select.PRC.unrelated.Regions){
 }
 #binned.chipseq = filtered.binned[, which(design$type=="chipseq")]
 
-save(binned.chipseq, binned.captured, 
-     norms.captured, norms.chipseq, design, file = paste0(NormDir, "normalization_factors_for_chipseq_captured_seq.Rdata"))
+save(filtered.binned, regions.sel, baits, design, file = paste0(NormDir, "normalization_factors_for_chipseq_captured_seq.Rdata"))
 
-
-Calculate.Scaling.factors.for.Chipseq = FALSE
-if(Calculate.Scaling.factors.for.Chipseq){
-  
- 
-  source("functions_analysis_captured.R")
-  
-  norms.chipseq = calcNormFactors.for.caputred.using.csaw(dd = binned.chipseq, method = "DESeq2", cutoff.average.counts = 300);
-  
-}
 
 ########################################################
 ########################################################
@@ -132,12 +122,19 @@ for(prot in c("Cbx7", "Ring1B")){
   counts = quantify.signals.within.peaks(peaks, bam.list = bams)
   #colnames(counts) = basename(bams)
   
-  binned.chipseq = filtered.binned[, which(design$type=="chipseq")]
-  source("functions_analysis_captured.R")
-  norms.chipseq = calcNormFactors.for.caputred.using.csaw(dd = binned.chipseq, method = "DESeq2", cutoff.average.counts = 300);
-  
-  norms = norms.chipseq$size.factors[match(design.matrix$bam.files, norms.chipseq$bam.files)] 
-  #design.matrix = data.frame(design.matrix)
+  Calculate.Scaling.factors.for.Chipseq = FALSE
+  if(Calculate.Scaling.factors.for.Chipseq){
+    
+    binned.chipseq = filtered.binned[, which(design$type=="chipseq")]
+    source("functions_analysis_captured.R")
+    
+    norms.chipseq = calcNormFactors.for.caputred.using.csaw(dd = binned.chipseq, method = "DESeq2", cutoff.average.counts = 300);
+    source("functions_analysis_captured.R")
+    norms.chipseq = calcNormFactors.for.caputred.using.csaw(dd = binned.chipseq, method = "DESeq2", cutoff.average.counts = 300);
+    
+    norms = norms.chipseq$size.factors[match(design.matrix$bam.files, norms.chipseq$bam.files)] 
+    #design.matrix = data.frame(design.matrix)
+  }
   
   kk = which(colnames(design.matrix) == "condition")
   
@@ -193,37 +190,42 @@ if(Normalize.chipseq.data){
 # identify signals in the baits for capture-seq data
 ########################################################
 ########################################################
+load(file = paste0(NormDir, "normalization_factors_for_chipseq_captured_seq.Rdata"))
+
+calculate.size.factors.by.select.PRC.unrelated.Regions.inBaits = TRUE
+
+###############################
+# quantify counts for baits with csaw
+###############################
+jj = which(design$type=="captured" & design$totals>10000)
+bams = design$bam.files[jj]
+design.matrix = design[jj, ]
+
 #frag.len <- 110
-win.width <- 2000
-chr.selected = c(paste0("chr", c(1:19)))
+win.width <- 200
+chr.selected = unique(baits$chr)
+chr.selected = chr.selected[order(chr.selected)]
 param <- readParam(pe="none", dedup = TRUE, minq=30, restrict = chr.selected)
 
-data <- windowCounts(bam.files, ext=110, width=win.width, param=param, bin = TRUE)
+data <- windowCounts(bams, ext=110, width=win.width, param=param, bin = TRUE)
 
 ## for normalization
 #binned <- windowCounts(bam.files, bin=TRUE, width=10000, param=param)
-save(data, binned, file = paste0(DIR.OUT, "readCounts_windows_csaw.Rdata"))
+save(data, file = paste0(resDir, "readCounts_windows_200bp_binned_csaw_for_captured.Rdata"))
 
 # check the windows and counts
 head(assay(data))
 head(rowRanges(data))
 
-# counting read for G11 reporter 
-#my.regions <- GRanges(c("chr15"),
-#                      IRanges(c(78819673), c(78905009)))
-
-#reg.counts <- regionCounts(bam.files, my.regions, ext=frag.len, param=param)
-#head(assay(reg.counts))
-load(file = paste0(DIR.OUT, "readCounts_windows_csaw.Rdata"))
+load(file = paste0(resDir, "readCounts_windows_200bp_binned_csaw_for_captured.Rdata"))
 
 ## filtering uninteresting windows
 Filter.With.Baits = TRUE
-if(Filter.With.Baits)
-{
+if(Filter.With.Baits){
   # import bait coordinates
   library(GenomicRanges)
   library(rtracklayer)
-  baits = read.delim(file="../../Oliver/capture_seq/baits/baits_mm9G11D_withG11D.bed", sep = "\t", header = FALSE)
+  baits = read.delim(file="../../../Oliver/capture_seq/baits/baits_mm9G11D_withG11D.bed", sep = "\t", header = FALSE)
   baits = data.frame(baits, stringsAsFactors = FALSE)
   colnames(baits) = c("chr", "start", "end")
   baits$score=1;
@@ -247,31 +249,37 @@ if(Filter.With.Baits)
   #summary(keep.simpl)
 }
 
-if(Select.PRC.unrelated.Regions.inBaits.forCapturedData){
+if(calculate.size.factors.by.select.PRC.unrelated.Regions.inBaits){
   
   binned.captured = filtered.binned[, which(design$type=="captured")]
   
   df = makeGRangesFromDataFrame(baits)
   
   # filter windows out for captured-seq data
-  suppressMessages(keep <- overlapsAny(rowRanges(binned.captured), df))
+  suppressMessages(keep <- overlapsAny(rowRanges(binned.captured), df, type = "within"))
   sum(keep)
   
   binned.captured = binned.captured[keep, ]
   
-  kk = which(binned.captured$totals>100000)
-  binned.captured = binned.captured[, kk]
+  #kk = which(binned.captured$totals>100000)
+  #binned.captured = binned.captured[, kk]
   
   source("functions_analysis_captured.R")
   norms.captured = calcNormFactors.for.caputred.using.csaw(dd = binned.captured, method = "DESeq2", cutoff.average.counts = 1000);
+  norms.captured$library.sizes = colSums(assay(binned.captured))
+  
+  norms.captured = norms.captured[match(design.matrix$bam.files, norms.captured$bam.files), ]
+  
+  par(mfrow=c(1,3))
+  plot(norms.captured$totals, norms.captured$size.factors, log='xy')
+  plot(norms.captured$totals, norms.captured$library.sizes, log='xy')
+  plot(norms.captured$library.sizes, norms.captured$size.factors, log='xy')
   
 }
 
-
-
-##################################################
-## Section: start to use DESeq2 to test differential binding
-##################################################
+###############################
+# Section: start to use DESeq2 to test differential binding
+###############################
 coordiantes = as.data.frame(rowRanges(filtered.data)) 
 ggs = apply(coordiantes[, c(1:3)], 1, function(x) gsub(" ", "",paste(as.character(unlist(x)), sep = "",  collapse = "_"), fixed = TRUE))
 #ggs = paste0(coordiantes[, c(1:3)], collapse = "_") 
@@ -279,24 +287,35 @@ aa = data.frame(ggs, assay(filtered.data), stringsAsFactors = FALSE)
 colnames(aa) = c('gene', basename(filtered.data$bam.files))
 
 ### test for differential binding
-genotype <- factor(sapply(filtered.data$bam.files, function(x) unlist(strsplit(as.character(basename(x)), "_"))[1]))
-IP <- factor(sapply(filtered.data$bam.files, function(x) unlist(strsplit(as.character(basename(x)), "_"))[2]))
-design = data.frame(samples=basename(filtered.data$bam.files),genotype,IP)
-rownames(design) = design$samples
-norms = filtered.data$norm.factors;
+#genotype <- factor(sapply(filtered.data$bam.files, function(x) unlist(strsplit(as.character(basename(x)), "_"))[1]))
+#IP <- factor(sapply(filtered.data$bam.files, function(x) unlist(strsplit(as.character(basename(x)), "_"))[2]))
+#design = data.frame(samples=basename(filtered.data$bam.files),genotype,IP)
+rownames(design.matrix) = basename(design.matrix$bam.files)
+design.matrix$size.factors = norms.captured$size.factors
+design.matrix$library.sizes = norms.captured$library.sizes/median(norms.captured$library.sizes)
 
 ## quality controls for all samples except inputs, because inputs seems to be not very good 
-sels = which(design$IP != "Input")
-read.count = aa[, c(sels+1)];
-source("RNAseq_Quality_Controls.R")
+#sels = which(design$IP != "Input")
 
-pdfname = paste0(resDir, "Data_Qulity_Assessment_all.pdf")
+pdfname = paste0(resDir, "Data_Qulity_Assessment_all_captured_signals_inBaits_librarySizes_nonPRC_regions_each_IP.pdf")
 pdf(pdfname, width = 12, height = 10)
 
-Check.RNAseq.Quality(read.count=read.count, design.matrix = data.frame(sample=colnames(read.count), design[sels, c(3, 2)]),
-                     keep.All = TRUE, norms = norms[sels])
+source("RNAseq_Quality_Controls.R")
+
+for(prot in unique(design.matrix$IP)){
+  #sels = c(1:nrow(design.matrix))
+  cat("IP --- ", prot, "\n")
+  sels = which(design.matrix$IP == prot)
+  read.count = aa[, c(sels+1)];
+  
+  Check.RNAseq.Quality(read.count=read.count, 
+                       design.matrix = data.frame(sample=colnames(read.count), design.matrix[sels, c(7)]), 
+                       norms = design.matrix$library.sizes[sels],
+                       keep.All = TRUE)
+}
 
 dev.off()
+
 
 require('DESeq2')
 

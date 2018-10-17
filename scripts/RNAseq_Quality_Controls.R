@@ -11,6 +11,15 @@ Check.RNAseq.Quality = function(read.count, design.matrix, keep.All = FALSE, nor
   library("RColorBrewer");
   library("dplyr"); 
   library("ggplot2")
+  
+  ##########################################
+  # order the samples according to the second column except the sample name 
+  ##########################################
+  o1 = order(design.matrix[,2])
+  design.matrix = design.matrix[o1, ]
+  read.count = read.count[, o1];
+  if(!is.null(norms)) norms = norms[o1];
+  
   #load(file=paste0('Rdata/Screen_countData_sgRNA_Gene_clean_mapping', version.data, '.Rdata'))
   # kk = grep('Ab', colnames(bb))
   if(ncol(design.matrix)>2){cc = apply(design.matrix[, -1], 1, paste0, collapse="_")
