@@ -387,8 +387,8 @@ find.samples.conditions = function(x, ID='samples')
 # Section: Differential Binding (DB) analysis after counting reads within peaks
 ########################################################
 ########################################################
-merge.peaks.macs2 = function(peak.list){
-  # peak.list = peaks
+merge.peaks.macs2 = function(peak.list, merge.dist = NULL){
+  # peak.list = peak.list[grep(prot, peak.list)]
   for(n in 1:length(peak.list)){
     cat(peak.list[n], "\n")
     if(n == 1){
@@ -399,6 +399,11 @@ merge.peaks.macs2 = function(peak.list){
     }
   }
   
+  if(!is.null(merge.dist)){
+    peaks.merged <- mergeWindows(peaks.merged, tol=merge.dist, ignore.strand = TRUE)
+    peaks.merged = peaks.merged$region
+    #peaks.merged = GenomicRanges::reduce(pps);
+  }
   peaks.merged = as.data.frame(peaks.merged)
   return(peaks.merged)
   
@@ -447,13 +452,13 @@ quantify.signals.within.peaks = function(peaks, bam.list, normalization = FALSE)
   ## save the peak information and quantified different rpkm signals within peaks
   #write.table(res, file=paste0(DIR.res, "/rpkm_within_chipeakk.txt"), sep = "\t", quote = FALSE, row.names = FALSE, col.names = TRUE)
   #save(peaks, res, file='Rdata/Peaks_merged_macs2_p_5_filtered_N2_gene_assignment_TSS_WBcel235_analysis_hisModif_tbx_signals_v1.Rdata')
-  colnames(res) = basename(bams)
+  colnames(res) = basename(bam.list)
   return(res)
   
 }
 
 ## inputs are counts, design.matrix
-DB.analysis= function(counts, design.matrix, size.factors = NULL, batch = FALSE, Threshold.read.counts = 20) 
+DB.analysis= function(counts, design.matrix, size.factors = NULL, batch = FALSE, Threshold.read.counts = 20, cex.pairwise = 0.01) 
 
 {
   require(lattice);
@@ -464,9 +469,9 @@ DB.analysis= function(counts, design.matrix, size.factors = NULL, batch = FALSE,
   library("RColorBrewer");
   library("dplyr"); 
       
-  #design.matrix = design.matrix[, kk];
-  #size.factors = NULL;
-  #Threshold.read.counts = 50
+  # design.matrix = design.matrix[, kk];
+  # size.factors = NULL;
+  # Threshold.read.counts = 50
   
   design.matrix = data.frame(design.matrix)
   if(ncol(design.matrix)==1) {
@@ -481,6 +486,17 @@ DB.analysis= function(counts, design.matrix, size.factors = NULL, batch = FALSE,
     eval(parse(text = paste0("dds <- DESeqDataSetFromMatrix(counts, DataFrame(design.matrix), design = ~ ", conds, ")")))
   }
   
+  cc.uniq = unique(conditions);
+  cols = match(conditions, cc.uniq)
+  
+  # show the raw counts
+  par(cex = 1.8, las = 1, mgp = c(1.6,0.5,0), mar = c(6,16,2,0.8)+0.1, tcl = -0.3)
+  par(mfrow=c(1,1))
+  
+  total = colSums(counts(dds));
+  barplot(total/10^6, horiz = TRUE, names.arg = colnames(raw), las=1, col = cols, main='Total nb of reads quantified for features', xlab='number of reads (Million)')
+  abline(v=c(1, 2, seq(5, 20, by=5)), col='red', lty=1, lwd=2.0);#abline(v=c(20, 45), col='red', lty=1, lwd=2.0)
+    
   # filter the lowly signal peaks
   dds <- dds[ rowSums(counts(dds)) > Threshold.read.counts, ]
   if(!is.null(size.factors)) {
@@ -490,9 +506,6 @@ DB.analysis= function(counts, design.matrix, size.factors = NULL, batch = FALSE,
   }
   fpm = fpm(dds, robust = TRUE)
   vsd <- varianceStabilizingTransformation(dds, blind = FALSE)
-  
-  cc.uniq = unique(conditions);
-  cols = match(conditions, cc.uniq)
  
   xx = fpm;
   ### boxplot (distribution) of gene expression for each sample
@@ -585,6 +598,9 @@ DB.analysis= function(counts, design.matrix, size.factors = NULL, batch = FALSE,
   #kk = match(dds$conds, cc.partC); ii = which(!is.na(kk));
   #if(length(unique(dds$conds[ii]))>2) pairs(yy[, ii], lower.panel=NULL, upper.panel=panel.fitting)
   
+  
+  return(dds)
+  
 }
 
 panel.cor <- function(x, y, digits=2, prefix="", cex.cor) 
@@ -606,7 +622,7 @@ panel.cor <- function(x, y, digits=2, prefix="", cex.cor)
   text(.8, .8, Signif, cex=cex, col=2) 
 }
 
-panel.fitting = function (x, y, bg = NA, pch = par("pch"), cex = 0.01, col='black') 
+panel.fitting = function (x, y, bg = NA, pch = par("pch"), cex = 0.8, col='black') 
 {
   #x = yy[,1];y=yy[,2];
   #kk = which(x>0 & y>0); x=x[kk];y=y[kk]

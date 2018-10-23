@@ -1,6 +1,34 @@
 calcNormFactors.for.caputred.using.csaw = function(dd, cutoff.average.counts = 20, method = "DESeq2")
 {
   # dd = binned.chipseq;
+  if(method == "DESeq2"){
+    require('DESeq2');
+    countData = assay(dd);
+    condition <- factor(rep("A", ncol(countData)))
+    
+    dds <- DESeqDataSetFromMatrix(assay(dd), data.frame(condition),  design = ~ 1 )
+    library.size=colSums(counts(dds));
+    #yy0 = rowSums(counts(dds)); cutoff.average.counts = quantile(yy0, 0.75) 
+    dds <- dds[ rowSums(counts(dds)) > cutoff.average.counts, ]
+    #fpm = fpm(dds, robust = TRUE)
+    
+    cat("after filtering--", nrow(dds), "\n")
+    
+    dds <- estimateSizeFactors(dds)
+    
+    norms = data.frame(as.data.frame(colData(dd)), size.factors = sizeFactors(dds), library.size = library.size/median(library.size))
+    
+    xx = norms$totals
+    yy = norms$size.factors
+    xx = xx/xx[1]; yy = yy/yy[1]
+    xx = 1/xx; yy = 1/yy;
+    plot(xx, yy, log = 'xy', xlab='library size', ylab="size.factors")
+    abline(0, 1, col='red', lwd=2.0)
+    text(xx, yy, basename(norms$bam.files), cex=0.6, pos = 1, offset = 0.5)
+    
+    #vsd <- varianceStabilizingTransformation(dds, blind = FALSE)
+  }
+  
   if(method == "edgeR"){
     abundances <- aveLogCPM(asDGEList(dd), prior.count = 1)
     summary(abundances)
@@ -49,32 +77,6 @@ calcNormFactors.for.caputred.using.csaw = function(dd, cutoff.average.counts = 2
     
   }
   
-  if(method == "DESeq2"){
-    require('DESeq2');
-    countData = assay(dd);
-    condition <- factor(rep("A", ncol(countData)))
-    
-    dds <- DESeqDataSetFromMatrix(assay(dd), data.frame(condition),  design = ~ 1 )
-    #yy0 = rowSums(counts(dds)); cutoff.average.counts = quantile(yy0, 0.8) 
-    dds <- dds[ rowSums(counts(dds)) > cutoff.average.counts, ]
-    #fpm = fpm(dds, robust = TRUE)
-    
-    cat("after filtering--", nrow(dds), "\n")
-    
-    dds <- estimateSizeFactors(dds)
-    
-    norms = data.frame(as.data.frame(colData(dd)), size.factors = sizeFactors(dds))
-    
-    xx = norms$totals
-    yy = norms$size.factors
-    xx = xx/xx[1]; yy = yy/yy[1]
-    xx = 1/xx; yy = 1/yy;
-    plot(xx, yy, log = 'xy', xlab='library size', ylab="size.factors")
-    abline(0, 1, col='red', lwd=2.0)
-    text(xx, yy, basename(norms$bam.files), cex=0.6, pos = 1, offset = 0.5)
-    
-    #vsd <- varianceStabilizingTransformation(dds, blind = FALSE)
-  }
-  
+ 
   return(norms)
 }
