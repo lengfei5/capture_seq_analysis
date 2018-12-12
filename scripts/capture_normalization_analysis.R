@@ -10,7 +10,6 @@ library(edgeR)
 library(GenomicRanges)
 library(rtracklayer)
 
-
 ## PRC unrelated regions and bait regions
 regions.sel = read.table(paste0(NormDir, "Complement_mergedPRCsubunits_peaks_fromJorgeChipseq_mm9G11_dual.bed"),
                          header = FALSE, sep = "\t")
@@ -308,12 +307,12 @@ if(Use.common.peaks.by.Cbx7_Ring1B.controlSamples){
   file.peaks.in.baits = "commen_peaks_by_Cbx7_Ring1B_Controlsample_in_baits"
   
   if(!file.exists(paste0(resDir, file.peaks.in.baits, ".Rdata"))){
-    DIR.peaks = "../../R6329_R6532_R6533_chipseq_captured/Peaks/macs2_broad"
+    DIR.peaks = "../../heatmaps/peaks_captured/macs2_broad"
     peak.list = list.files(path = DIR.peaks, pattern = "*.xls", full.names = TRUE)
-    peak.list = peak.list[grep("710", peak.list)]
+    #peak.list = peak.list[grep("710", peak.list)]
     
     source("functions_chipSeq.R")
-    peaks = merge.peaks.macs2(peak.list[grep("Negative.Control", peak.list)], merge.dist = 2000);
+    peaks = merge.peaks.macs2(peak.list[grep("Negative.Control", peak.list)]);
     
     suppressMessages(keep <- overlapsAny(makeGRangesFromDataFrame(peaks), baits.df))
     sum(keep)
@@ -361,7 +360,7 @@ prots = prots[which(prots!="Input")]
 
 for(n in 1:length(prots)){
   
-  # n = 2;
+  # n = 4;
   prot = prots[n];
   cat(n, "---", prot, "\n")
   # prot = "Cbx7"
@@ -408,7 +407,7 @@ for(n in 1:length(prots)){
     
     dds = estimateDispersions(dds, fitType = "parametric")
     par(cex = 1.0, las = 1, mgp = c(2,0.2,0), mar = c(3,2,2,0.2), tcl = -0.3)
-    plotDispEsts(dds, ylim=c(0.001, 10), cex=0.6)
+    #plotDispEsts(dds, ylim=c(0.001, 10), cex=0.6)
     
     dds = nbinomWaldTest(dds, betaPrior = TRUE)
     resultsNames(dds)
